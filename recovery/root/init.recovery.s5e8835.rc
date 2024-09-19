@@ -1,0 +1,55 @@
+/import init.recovery.samsung.rc
+/import teegris.rc
+/import teegris_tui.rc
+
+
+on init
+    write /proc/sys/kernel/hung_task_timeout_secs 0
+
+    start watchdogd
+
+on late-init
+    setprop sys.usb.controller 13200000.dwc3
+    setprop ro.debuggable 1
+    setprop service.adb.root 1
+    setprop sys.usb.configfs 1
+    setprop sys.usb.config adb
+
+on boot
+
+# Set watchdog timer to 30 seconds and fed it every 10 seconds to get a 20 second margin
+service watchdogd /system/bin/watchdogd 10 20
+    class core
+    oneshot
+    seclabel u:r:watchdogd:s0
+
+service vendor.gatekeeper-1-0 /vendor/bin/hw/android.hardware.gatekeeper@1.0-service
+    interface android.hardware.gatekeeper@1.0::IGatekeeper default
+    class hal
+    user system
+    group system 5678
+
+on post-fs-data
+    mkdir /data/vendor/gatekeeper 0770 system system
+
+
+service vendor.keymint-default /vendor/bin/hw/android.hardware.security.keymint-service
+    class early_hal
+    user system
+    group system drmrpc
+
+on post-fs
+    mkdir /mnt/vendor/efs/DAK 0775 system system
+    restorecon -R /mnt/vendor/efs/DAK
+    chown system system /mnt/vendor/efs/DAK/gakkeybox
+    chmod 0644 /mnt/vendor/efs/DAK/gakkeybox
+
+on post-fs-data
+    mkdir /data/vendor/keymaster 0775 system system
+    
+service vendor.fkeymaster-default /vendor/bin/vendor.samsung.hardware.security.fkeymaster-service
+    interface aidl vendor.samsung.hardware.security.fkeymaster.ISehFkeymaster/default
+    class early_hal
+    user system
+    group system
+
